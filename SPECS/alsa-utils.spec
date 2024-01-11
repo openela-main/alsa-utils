@@ -1,4 +1,4 @@
-%define   baseversion     1.2.8
+%define   baseversion     1.2.9
 #define   fixversion      .2
 %global   _hardened_build 1
 
@@ -222,6 +222,9 @@ fi
 %systemd_postun_with_restart alsa-state.service
 
 %changelog
+* Wed May 17 2023 Jaroslav Kysela <perex@perex.cz> - 1.2.9-1
+* Updated to 1.2.9
+
 * Tue Oct 25 2022 Jaroslav Kysela <perex@perex.cz> - 1.2.8-1
 - Updated to 1.2.8
 - Do not build alsa-ucm-utils and alsa-topology-utils subpackages for RHEL
