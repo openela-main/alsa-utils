@@ -1,0 +1,1821 @@
+From a90faa2dd644af585d6a00f0aaf297c15ea0aa7b Mon Sep 17 00:00:00 2001
+From: Jaroslav Kysela <perex@perex.cz>
+Date: Mon, 4 Sep 2023 16:33:47 +0200
+Subject: [PATCH 02/18] axfer: use ATTRIBUTE_UNUSED instead remove argument
+ name
+
+We need to support older compilers than GCC 11.
+
+Link: https://github.com/alsa-project/alsa-utils/issues/233
+Fixes: ad5a1c0 ("axfer: fix the verbose compilation warnings for latest gcc")
+Signed-off-by: Jaroslav Kysela <perex@perex.cz>
+---
+ axfer/container-raw.c         | 14 +++++++-------
+ axfer/mapper-single.c         |  6 +++---
+ axfer/subcmd-list.c           |  2 +-
+ axfer/subcmd-transfer.c       |  4 ++--
+ axfer/waiter-poll.c           |  4 ++--
+ axfer/waiter-select.c         |  4 ++--
+ axfer/waiter.h                |  1 +
+ axfer/xfer-libasound-irq-rw.c |  2 +-
+ axfer/xfer-libasound.c        |  4 ++--
+ axfer/xfer-options.c          |  3 ++-
+ 10 files changed, 23 insertions(+), 21 deletions(-)
+
+diff --git a/axfer/container-raw.c b/axfer/container-raw.c
+index 071f94c..1886045 100644
+--- a/axfer/container-raw.c
++++ b/axfer/container-raw.c
+@@ -13,10 +13,10 @@
+ #include <sys/stat.h>
+ #include <unistd.h>
+ 
+-static int raw_builder_pre_process(struct container_context *,
+-				   snd_pcm_format_t *,
+-				   unsigned int *,
+-				   unsigned int *,
++static int raw_builder_pre_process(struct container_context *cntr ATTRIBUTE_UNUSED,
++				   snd_pcm_format_t *format ATTRIBUTE_UNUSED,
++				   unsigned int *samples_per_frame ATTRIBUTE_UNUSED,
++				   unsigned int *frames_per_second ATTRIBUTE_UNUSED,
+ 				   uint64_t *byte_count)
+ {
+ 	*byte_count = UINT64_MAX;
+@@ -25,9 +25,9 @@ static int raw_builder_pre_process(struct container_context *,
+ }
+ 
+ static int raw_parser_pre_process(struct container_context *cntr,
+-				  snd_pcm_format_t *,
+-				  unsigned int *,
+-				  unsigned int *,
++				  snd_pcm_format_t *format ATTRIBUTE_UNUSED,
++				  unsigned int *samples_per_frame ATTRIBUTE_UNUSED,
++				  unsigned int *frames_per_second ATTRIBUTE_UNUSED,
+ 				  uint64_t *byte_count)
+ {
+ 	struct stat buf = {0};
+diff --git a/axfer/mapper-single.c b/axfer/mapper-single.c
+index 13e7fc5..f669f7f 100644
+--- a/axfer/mapper-single.c
++++ b/axfer/mapper-single.c
+@@ -62,7 +62,7 @@ static void align_from_vector(void *frame_buf, unsigned int frame_count,
+ 
+ static int single_pre_process(struct mapper_context *mapper,
+ 			      struct container_context *cntrs,
+-			      unsigned int)
++			      unsigned int cntr_count ATTRIBUTE_UNUSED)
+ {
+ 	struct single_state *state = mapper->private_data;
+ 	unsigned int bytes_per_buffer;
+@@ -110,7 +110,7 @@ static int single_muxer_process_frames(struct mapper_context *mapper,
+ 				       void *frame_buf,
+ 				       unsigned int *frame_count,
+ 				       struct container_context *cntrs,
+-				       unsigned int)
++				       unsigned int cntr_count ATTRIBUTE_UNUSED)
+ {
+ 	struct single_state *state = mapper->private_data;
+ 	void *src;
+@@ -141,7 +141,7 @@ static int single_demuxer_process_frames(struct mapper_context *mapper,
+ 					 void *frame_buf,
+ 					 unsigned int *frame_count,
+ 					 struct container_context *cntrs,
+-					 unsigned int)
++					 unsigned int cntr_count ATTRIBUTE_UNUSED)
+ {
+ 	struct single_state *state = mapper->private_data;
+ 	void *dst;
+diff --git a/axfer/subcmd-list.c b/axfer/subcmd-list.c
+index f9c8e0f..187e1d7 100644
+--- a/axfer/subcmd-list.c
++++ b/axfer/subcmd-list.c
+@@ -19,7 +19,7 @@ enum list_op {
+ };
+ 
+ static int dump_device(snd_ctl_t *handle, const char *id, const char *name,
+-		       snd_pcm_stream_t, snd_pcm_info_t *info)
++		       snd_pcm_stream_t stream ATTRIBUTE_UNUSED, snd_pcm_info_t *info)
+ {
+ 	unsigned int i, count;
+ 	int err;
+diff --git a/axfer/subcmd-transfer.c b/axfer/subcmd-transfer.c
+index b39fde8..8d63043 100644
+--- a/axfer/subcmd-transfer.c
++++ b/axfer/subcmd-transfer.c
+@@ -40,7 +40,7 @@ static void handle_unix_signal_for_finish(int sig)
+ 	ctx_ptr->interrupted = true;
+ }
+ 
+-static void handle_unix_signal_for_suspend(int)
++static void handle_unix_signal_for_suspend(int sig ATTRIBUTE_UNUSED)
+ {
+ 	sigset_t curr, prev;
+ 	struct sigaction sa = {0};
+@@ -439,7 +439,7 @@ static int context_process_frames(struct context *ctx,
+ }
+ 
+ static void context_post_process(struct context *ctx,
+-				 uint64_t)
++				 uint64_t accumulated_frame_count ATTRIBUTE_UNUSED)
+ {
+ 	uint64_t total_frame_count;
+ 	unsigned int i;
+diff --git a/axfer/waiter-poll.c b/axfer/waiter-poll.c
+index 31fab88..b81300c 100644
+--- a/axfer/waiter-poll.c
++++ b/axfer/waiter-poll.c
+@@ -13,7 +13,7 @@
+ #include <errno.h>
+ #include <poll.h>
+ 
+-static int poll_prepare(struct waiter_context *)
++static int poll_prepare(struct waiter_context *waiter ATTRIBUTE_UNUSED)
+ {
+ 	// Nothing to do because an instance of waiter has required data.
+ 	return 0;
+@@ -30,7 +30,7 @@ static int poll_wait_event(struct waiter_context *waiter, int timeout_msec)
+ 	return err;
+ }
+ 
+-static void poll_release(struct waiter_context *)
++static void poll_release(struct waiter_context *waiter ATTRIBUTE_UNUSED)
+ {
+ 	// Nothing to do because an instance of waiter has required data.
+ 	return;
+diff --git a/axfer/waiter-select.c b/axfer/waiter-select.c
+index 164c9c8..fe19776 100644
+--- a/axfer/waiter-select.c
++++ b/axfer/waiter-select.c
+@@ -34,7 +34,7 @@ struct select_state {
+ 	fd_set rfds_ex;
+ };
+ 
+-static int select_prepare(struct waiter_context *)
++static int select_prepare(struct waiter_context *waiter ATTRIBUTE_UNUSED)
+ {
+ 	return 0;
+ }
+@@ -94,7 +94,7 @@ static int select_wait_event(struct waiter_context *waiter, int timeout_msec)
+ 	return err;
+ }
+ 
+-static void select_release(struct waiter_context *)
++static void select_release(struct waiter_context *waiter ATTRIBUTE_UNUSED)
+ {
+ 	return;
+ }
+diff --git a/axfer/waiter.h b/axfer/waiter.h
+index db18e33..0f4e9b9 100644
+--- a/axfer/waiter.h
++++ b/axfer/waiter.h
+@@ -9,6 +9,7 @@
+ #ifndef __ALSA_UTILS_AXFER_WAITER__H_
+ #define __ALSA_UTILS_AXFER_WAITER__H_
+ 
++#include <alsa/global.h>
+ #include <poll.h>
+ 
+ enum waiter_type {
+diff --git a/axfer/xfer-libasound-irq-rw.c b/axfer/xfer-libasound-irq-rw.c
+index b7f0645..45fb6d5 100644
+--- a/axfer/xfer-libasound-irq-rw.c
++++ b/axfer/xfer-libasound-irq-rw.c
+@@ -313,7 +313,7 @@ error:
+ }
+ 
+ static int w_process_frames_nonblocking(struct libasound_state *state,
+-					snd_pcm_state_t,
++					snd_pcm_state_t pcm_state ATTRIBUTE_UNUSED,
+ 					unsigned int *frame_count,
+ 					struct mapper_context *mapper,
+ 					struct container_context *cntrs)
+diff --git a/axfer/xfer-libasound.c b/axfer/xfer-libasound.c
+index 9713533..36ee08d 100644
+--- a/axfer/xfer-libasound.c
++++ b/axfer/xfer-libasound.c
+@@ -60,7 +60,7 @@ static const struct option l_opts[] = {
+ };
+ 
+ static int xfer_libasound_init(struct xfer_context *xfer,
+-			       snd_pcm_stream_t)
++			       snd_pcm_stream_t stream ATTRIBUTE_UNUSED)
+ {
+ 	struct libasound_state *state = xfer->private_data;
+ 	int err;
+@@ -887,7 +887,7 @@ static void xfer_libasound_destroy(struct xfer_context *xfer)
+ 	state->log = NULL;
+ }
+ 
+-static void xfer_libasound_help(struct xfer_context *)
++static void xfer_libasound_help(struct xfer_context *xfer ATTRIBUTE_UNUSED)
+ {
+ 	printf(
+ "      [BASICS]\n"
+diff --git a/axfer/xfer-options.c b/axfer/xfer-options.c
+index 974570c..e716ded 100644
+--- a/axfer/xfer-options.c
++++ b/axfer/xfer-options.c
+@@ -447,7 +447,8 @@ static int generate_path_with_suffix(struct xfer_context *xfer,
+ 
+ static int generate_path_without_suffix(struct xfer_context *xfer,
+ 				        const char *template,
+-					unsigned int index, const char *)
++					unsigned int index,
++					const char *suffix ATTRIBUTE_UNUSED)
+ {
+ 	static const char *const single_format = "%s";
+ 	static const char *const multiple_format = "%s-%i";
+-- 
+2.41.0
+
+
+From 2db896afd475b0b3ad07e97ba74ec9680b4f7f6d Mon Sep 17 00:00:00 2001
+From: Jaroslav Kysela <perex@perex.cz>
+Date: Mon, 4 Sep 2023 16:37:24 +0200
+Subject: [PATCH 03/18] amidi: use ATTRIBUTE_UNUSED instead remove argument
+ name
+
+We need to support older compilers than GCC 11.
+
+Link: https://github.com/alsa-project/alsa-utils/issues/233
+Fixes: 1843540 ("amidi: fix the verbose compilation warnings for latest gcc")
+Signed-off-by: Jaroslav Kysela <perex@perex.cz>
+---
+ amidi/amidi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/amidi/amidi.c b/amidi/amidi.c
+index f930ca8..75fb8c0 100644
+--- a/amidi/amidi.c
++++ b/amidi/amidi.c
+@@ -446,7 +446,7 @@ static void print_byte(unsigned char byte, struct timespec *ts)
+ 	printf("%02X", byte);
+ }
+ 
+-static void sig_handler(int)
++static void sig_handler(int sig ATTRIBUTE_UNUSED)
+ {
+ 	stop = 1;
+ }
+-- 
+2.41.0
+
+
+From 7552aef6e08b5b1fd8c1704e21cb9f6f15017bfa Mon Sep 17 00:00:00 2001
+From: Jaroslav Kysela <perex@perex.cz>
+Date: Mon, 4 Sep 2023 16:45:09 +0200
+Subject: [PATCH 04/18] alsaloop: use ATTRIBUTE_UNUSED instead remove argument
+ name
+
+We need to support older compilers than GCC 11.
+
+Link: https://github.com/alsa-project/alsa-utils/issues/233
+Fixes: d609a58 ("alsaloop: fix the verbose compilation warnings for latest gcc")
+Signed-off-by: Jaroslav Kysela <perex@perex.cz>
+---
+ alsaloop/alsaloop.c | 2 +-
+ alsaloop/pcmjob.c   | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/alsaloop/alsaloop.c b/alsaloop/alsaloop.c
+index b10733e..51fb646 100644
+--- a/alsaloop/alsaloop.c
++++ b/alsaloop/alsaloop.c
+@@ -821,7 +821,7 @@ static void send_to_all(int sig)
+ 	}
+ }
+ 
+-static void signal_handler(int)
++static void signal_handler(int sig ATTRIBUTE_UNUSED)
+ {
+ 	quit = 1;
+ 	send_to_all(SIGUSR2);
+diff --git a/alsaloop/pcmjob.c b/alsaloop/pcmjob.c
+index be71971..ffb439b 100644
+--- a/alsaloop/pcmjob.c
++++ b/alsaloop/pcmjob.c
+@@ -625,7 +625,7 @@ static void buf_add_src(struct loopback *loop)
+ 	}
+ }
+ #else
+-static void buf_add_src(struct loopback *)
++static void buf_add_src(struct loopback *loop ATTRIBUTE_UNUSED)
+ {
+ }
+ #endif
+@@ -1794,7 +1794,7 @@ static int ctl_event_check(snd_ctl_elem_value_t *val, snd_ctl_event_t *ev)
+ }
+ 
+ static int handle_ctl_events(struct loopback_handle *lhandle,
+-			     unsigned short)
++			     unsigned short events ATTRIBUTE_UNUSED)
+ {
+ 	struct loopback *loop = lhandle->loopback;
+ 	snd_ctl_event_t *ev;
+-- 
+2.41.0
+
+
+From 94eeb5a40f77e92624eb32d2e9c50b1cd9e4f837 Mon Sep 17 00:00:00 2001
+From: Jaroslav Kysela <perex@perex.cz>
+Date: Mon, 4 Sep 2023 16:49:03 +0200
+Subject: [PATCH 05/18] bat: use ATTRIBUTE_UNUSED instead remove argument name
+
+We need to support older compilers than GCC 11.
+
+Link: https://github.com/alsa-project/alsa-utils/issues/233
+Fixes: b366875 ("bat: fix the verbose compilation warnings for latest gcc")
+Signed-off-by: Jaroslav Kysela <perex@perex.cz>
+---
+ bat/bat.c    | 3 ++-
+ bat/common.c | 3 ++-
+ bat/common.h | 5 +++++
+ 3 files changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/bat/bat.c b/bat/bat.c
+index e88c65f..ea04ed9 100644
+--- a/bat/bat.c
++++ b/bat/bat.c
+@@ -158,7 +158,8 @@ static void get_format(struct bat *bat, char *optarg)
+ 	}
+ }
+ 
+-static inline int thread_wait_completion(struct bat *, pthread_t id, int **val)
++static inline int thread_wait_completion(struct bat *bat ATTRIBUTE_UNUSED,
++					 pthread_t id, int **val)
+ {
+ 	int err;
+ 
+diff --git a/bat/common.c b/bat/common.c
+index 9ff9405..470a7e6 100644
+--- a/bat/common.c
++++ b/bat/common.c
+@@ -47,7 +47,8 @@ static int update_fmt_to_bat(struct bat *bat, struct chunk_fmt *fmt)
+ }
+ 
+ /* calculate frames and update to bat */
+-static int update_frames_to_bat(struct bat *bat, struct wav_chunk_header *header, FILE *)
++static int update_frames_to_bat(struct bat *bat, struct wav_chunk_header *header,
++				FILE *file ATTRIBUTE_UNUSED)
+ {
+ 	/* The number of analyzed captured frames is arbitrarily set to half of
+ 	   the number of frames of the wav file or the number of frames of the
+diff --git a/bat/common.h b/bat/common.h
+index a9bae5d..bb51b0d 100644
+--- a/bat/common.h
++++ b/bat/common.h
+@@ -13,6 +13,11 @@
+  *
+  */
+ 
++#ifndef ATTRIBUTE_UNUSED
++/** do not print warning (gcc) when function parameter is not used */
++#define ATTRIBUTE_UNUSED __attribute__ ((__unused__))
++#endif
++
+ #define TEMP_RECORD_FILE_NAME		"/tmp/bat.wav.XXXXXX"
+ #define DEFAULT_DEV_NAME		"default"
+ 
+-- 
+2.41.0
+
+
+From 66112d60e4ce68720022eaf26080c0f1a2caf81f Mon Sep 17 00:00:00 2001
+From: Jaroslav Kysela <perex@perex.cz>
+Date: Mon, 4 Sep 2023 16:52:46 +0200
+Subject: [PATCH 06/18] seq: use ATTRIBUTE_UNUSED instead remove argument name
+
+We need to support older compilers than GCC 11.
+
+Link: https://github.com/alsa-project/alsa-utils/issues/233
+Fixes: 181e190 ("aplaymidi: fix the verbose compilation warnings for latest gcc")
+Fixes: a03377a ("aseqnet: fix the verbose compilation warnings for latest gcc")
+Fixes: 429c32a ("aseqdump: fix the verbose compilation warnings for latest gcc")
+Fixes: 0b48dd6 ("aconnect: fix the verbose compilation warnings for latest gcc")
+Signed-off-by: Jaroslav Kysela <perex@perex.cz>
+---
+ seq/aconnect/aconnect.c     | 9 ++++++---
+ seq/aplaymidi/arecordmidi.c | 2 +-
+ seq/aseqdump/aseqdump.c     | 2 +-
+ seq/aseqnet/aseqnet.c       | 2 +-
+ 4 files changed, 9 insertions(+), 6 deletions(-)
+
+diff --git a/seq/aconnect/aconnect.c b/seq/aconnect/aconnect.c
+index 3a10de9..7096feb 100644
+--- a/seq/aconnect/aconnect.c
++++ b/seq/aconnect/aconnect.c
+@@ -193,7 +193,8 @@ static void do_search_port(snd_seq_t *seq, int perm, action_func_t do_action)
+ }
+ 
+ 
+-static void print_port(snd_seq_t *, snd_seq_client_info_t *cinfo,
++static void print_port(snd_seq_t *seq ATTRIBUTE_UNUSED,
++		       snd_seq_client_info_t *cinfo,
+ 		       snd_seq_port_info_t *pinfo, int count)
+ {
+ 	if (! count) {
+@@ -247,8 +248,10 @@ static void print_port_and_subs(snd_seq_t *seq, snd_seq_client_info_t *cinfo,
+ /*
+  * remove all (exported) connections
+  */
+-static void remove_connection(snd_seq_t *seq, snd_seq_client_info_t *,
+-			      snd_seq_port_info_t *pinfo, int)
++static void remove_connection(snd_seq_t *seq,
++			      snd_seq_client_info_t *info ATTRIBUTE_UNUSED,
++			      snd_seq_port_info_t *pinfo,
++			      int count ATTRIBUTE_UNUSED)
+ {
+ 	snd_seq_query_subscribe_t *query;
+ 	snd_seq_port_info_t *port;
+diff --git a/seq/aplaymidi/arecordmidi.c b/seq/aplaymidi/arecordmidi.c
+index ce71472..a4c1181 100644
+--- a/seq/aplaymidi/arecordmidi.c
++++ b/seq/aplaymidi/arecordmidi.c
+@@ -719,7 +719,7 @@ static void version(void)
+ 	fputs("arecordmidi version " SND_UTIL_VERSION_STR "\n", stderr);
+ }
+ 
+-static void sighandler(int)
++static void sighandler(int sig ATTRIBUTE_UNUSED)
+ {
+ 	stop = 1;
+ }
+diff --git a/seq/aseqdump/aseqdump.c b/seq/aseqdump/aseqdump.c
+index 8455ecb..af4ca21 100644
+--- a/seq/aseqdump/aseqdump.c
++++ b/seq/aseqdump/aseqdump.c
+@@ -676,7 +676,7 @@ static void version(void)
+ 	puts("aseqdump version " SND_UTIL_VERSION_STR);
+ }
+ 
+-static void sighandler(int)
++static void sighandler(int sig ATTRIBUTE_UNUSED)
+ {
+ 	stop = 1;
+ }
+diff --git a/seq/aseqnet/aseqnet.c b/seq/aseqnet/aseqnet.c
+index f40de7d..aa70b50 100644
+--- a/seq/aseqnet/aseqnet.c
++++ b/seq/aseqnet/aseqnet.c
+@@ -334,7 +334,7 @@ static void get_net_addr(struct addrinfo *rp, char *buf, size_t buflen)
+ /*
+  * signal handler
+  */
+-static void sigterm_exit(int)
++static void sigterm_exit(int sig ATTRIBUTE_UNUSED)
+ {
+ 	close_files();
+ 	exit(1);
+-- 
+2.41.0
+
+
+From 9e5e9a6d70de63bea01f0669b01319952f2cfdea Mon Sep 17 00:00:00 2001
+From: Jaroslav Kysela <perex@perex.cz>
+Date: Mon, 4 Sep 2023 16:57:47 +0200
+Subject: [PATCH 07/18] alsaucm: use ATTRIBUTE_UNUSED instead remove argument
+ name
+
+We need to support older compilers than GCC 11.
+
+Link: https://github.com/alsa-project/alsa-utils/issues/233
+Fixes: d7bbc26 ("alsaucm: fix the verbose compilation warnings for latest gcc")
+Signed-off-by: Jaroslav Kysela <perex@perex.cz>
+---
+ alsaucm/dump.c | 22 ++++++++++++----------
+ 1 file changed, 12 insertions(+), 10 deletions(-)
+
+diff --git a/alsaucm/dump.c b/alsaucm/dump.c
+index 102ac4d..a5c57f2 100644
+--- a/alsaucm/dump.c
++++ b/alsaucm/dump.c
+@@ -93,7 +93,8 @@ static char *tesc(const char *s, char *buf, size_t buf_len)
+ 
+ #define ESC(s, esc) tesc((s), (esc), sizeof(esc))
+ 
+-static int text_verb_start(struct renderer *, const char *verb, const char *comment)
++static int text_verb_start(struct renderer *r ATTRIBUTE_UNUSED,
++			   const char *verb, const char *comment)
+ {
+ 	char buf1[128], buf2[128];
+ 	printf("Verb.%s {\n", ESC(verb, buf1));
+@@ -102,13 +103,13 @@ static int text_verb_start(struct renderer *, const char *verb, const char *comm
+ 	return 0;
+ }
+ 
+-static int text_verb_end(struct renderer *)
++static int text_verb_end(struct renderer *r ATTRIBUTE_UNUSED)
+ {
+ 	printf("}\n");
+ 	return 0;
+ }
+ 
+-static int text_2nd_level_begin(struct renderer *,
++static int text_2nd_level_begin(struct renderer *r ATTRIBUTE_UNUSED,
+ 				const char *key,
+ 				const char *val,
+ 				const char *comment)
+@@ -120,19 +121,19 @@ static int text_2nd_level_begin(struct renderer *,
+ 	return 0;
+ }
+ 
+-static int text_2nd_level_end(struct renderer *)
++static int text_2nd_level_end(struct renderer *r ATTRIBUTE_UNUSED)
+ {
+ 	printf("\t}\n");
+ 	return 0;
+ }
+ 
+-static int text_2nd_level(struct renderer *, const char *txt)
++static int text_2nd_level(struct renderer *r ATTRIBUTE_UNUSED, const char *txt)
+ {
+ 	printf("\t\t%s", txt);
+ 	return 0;
+ }
+ 
+-static int text_3rd_level(struct renderer *, const char *txt)
++static int text_3rd_level(struct renderer *r ATTRIBUTE_UNUSED, const char *txt)
+ {
+ 	printf("\t\t\t%s", txt);
+ 	return 0;
+@@ -266,7 +267,7 @@ static void json_block(struct renderer *r, int level, int last)
+ 	j->block[level] = last ? 0 : 1;
+ }
+ 
+-static int json_init(struct renderer *)
++static int json_init(struct renderer *r ATTRIBUTE_UNUSED)
+ {
+ 	printf("{\n  \"Verbs\": {");
+ 	return 0;
+@@ -325,13 +326,13 @@ static int json_2nd_level_end(struct renderer *r)
+ 	return 0;
+ }
+ 
+-static int json_2nd_level(struct renderer *, const char *txt)
++static int json_2nd_level(struct renderer *r ATTRIBUTE_UNUSED, const char *txt)
+ {
+ 	printf("          %s", txt);
+ 	return 0;
+ }
+ 
+-static int json_3rd_level(struct renderer *, const char *txt)
++static int json_3rd_level(struct renderer *r ATTRIBUTE_UNUSED, const char *txt)
+ {
+ 	printf("            %s", txt);
+ 	return 0;
+@@ -360,7 +361,8 @@ static int json_supcon_start(struct renderer *r, const char *key)
+ 	return 0;
+ }
+ 
+-static int json_supcon_value(struct renderer *r, const char *value, int)
++static int json_supcon_value(struct renderer *r, const char *value,
++			     int last ATTRIBUTE_UNUSED)
+ {
+ 	char buf[256];
+ 	JESC(value, buf);
+-- 
+2.41.0
+
+
+From dfe1c7143ab6ea01789e276b1ba361a00e545997 Mon Sep 17 00:00:00 2001
+From: Jaroslav Kysela <perex@perex.cz>
+Date: Mon, 4 Sep 2023 17:11:05 +0200
+Subject: [PATCH 08/18] topology: use ATTRIBUTE_UNUSED instead remove argument
+ name
+
+We need to support older compilers than GCC 11.
+
+Link: https://github.com/alsa-project/alsa-utils/issues/233
+Fixes: 153d185 ("topology: fix the verbose compilation warnings for latest gcc")
+Signed-off-by: Jaroslav Kysela <perex@perex.cz>
+---
+ topology/nhlt/intel/dmic-nhlt.c       |  3 ++-
+ topology/nhlt/intel/dmic/dmic-debug.c |  7 ++++---
+ topology/nhlt/intel/ssp/ssp-debug.c   |  5 +++--
+ topology/nhlt/intel/ssp/ssp-process.c |  4 +++-
+ topology/nhlt/nhlt-processor.c        |  7 +++++--
+ topology/pre-process-class.c          | 10 +++++-----
+ topology/pre-process-object.c         | 21 +++++++++++----------
+ topology/pre-processor.c              | 10 ++++++----
+ 8 files changed, 39 insertions(+), 28 deletions(-)
+
+diff --git a/topology/nhlt/intel/dmic-nhlt.c b/topology/nhlt/intel/dmic-nhlt.c
+index 70a22e3..de659cf 100644
+--- a/topology/nhlt/intel/dmic-nhlt.c
++++ b/topology/nhlt/intel/dmic-nhlt.c
+@@ -10,6 +10,7 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
++#include <alsa/global.h>
+ #include <alsa/input.h>
+ #include <alsa/output.h>
+ #include <alsa/conf.h>
+@@ -155,7 +156,7 @@ static int set_vendor_mic_data(struct intel_nhlt_params *nhlt, snd_config_t *cfg
+ 				   horizontal_angle_end);
+ }
+ 
+-static int set_bytes_data(struct intel_nhlt_params *, snd_config_t *cfg)
++static int set_bytes_data(struct intel_nhlt_params *nhlt ATTRIBUTE_UNUSED, snd_config_t *cfg)
+ {
+ 	snd_config_iterator_t i, next;
+ 	snd_config_t *n;
+diff --git a/topology/nhlt/intel/dmic/dmic-debug.c b/topology/nhlt/intel/dmic/dmic-debug.c
+index f99d308..a977c93 100644
+--- a/topology/nhlt/intel/dmic/dmic-debug.c
++++ b/topology/nhlt/intel/dmic/dmic-debug.c
+@@ -8,6 +8,7 @@
+ #include "aconfig.h"
+ #include <stdio.h>
+ #include <stdint.h>
++#include <alsa/global.h>
+ #include "dmic-debug.h"
+ 
+ #ifdef NHLT_DEBUG
+@@ -181,7 +182,7 @@ void dmic_print_internal(struct intel_dmic_params *dmic)
+ }
+ 
+ #else /* NHLT_DEBUG */
+-void dmic_print_bytes_as_hex(uint8_t *, size_t) {}
+-void dmic_print_integers_as_hex(uint32_t *, size_t) {}
+-void dmic_print_internal(struct intel_dmic_params *) {}
++void dmic_print_bytes_as_hex(uint8_t *src ATTRIBUTE_UNUSED, size_t size ATTRIBUTE_UNUSED) {}
++void dmic_print_integers_as_hex(uint32_t *src ATTRIBUTE_UNUSED, size_t size ATTRIBUTE_UNUSED) {}
++void dmic_print_internal(struct intel_dmic_params *dmic ATTRIBUTE_UNUSED) {}
+ #endif
+diff --git a/topology/nhlt/intel/ssp/ssp-debug.c b/topology/nhlt/intel/ssp/ssp-debug.c
+index 8c64675..2d2f6b0 100644
+--- a/topology/nhlt/intel/ssp/ssp-debug.c
++++ b/topology/nhlt/intel/ssp/ssp-debug.c
+@@ -7,6 +7,7 @@
+ #include "aconfig.h"
+ #include <stdio.h>
+ #include <stdint.h>
++#include <alsa/global.h>
+ #include "ssp-debug.h"
+ #include "../intel-nhlt.h"
+ 
+@@ -252,6 +253,6 @@ void ssp_print_internal(struct intel_ssp_params *ssp)
+ }
+ 
+ #else /* NHLT_DEBUG */
+-void ssp_print_internal(struct intel_ssp_params *) {}
+-void ssp_print_calculated(struct intel_ssp_params *) {}
++void ssp_print_internal(struct intel_ssp_params *ssp ATTRIBUTE_UNUSED) {}
++void ssp_print_calculated(struct intel_ssp_params *ssp ATTRIBUTE_UNUSED) {}
+ #endif
+diff --git a/topology/nhlt/intel/ssp/ssp-process.c b/topology/nhlt/intel/ssp/ssp-process.c
+index 9cda5c3..17b88d2 100644
+--- a/topology/nhlt/intel/ssp/ssp-process.c
++++ b/topology/nhlt/intel/ssp/ssp-process.c
+@@ -14,6 +14,7 @@
+ #include <stdlib.h>
+ #include <string.h>
+ #include <stdbool.h>
++#include <alsa/global.h>
+ #include <alsa/input.h>
+ #include <alsa/output.h>
+ #include <alsa/conf.h>
+@@ -952,7 +953,8 @@ int ssp_set_params(struct intel_nhlt_params *nhlt, const char *dir, int dai_inde
+ 	return 0;
+ }
+ 
+-int ssp_hw_set_params(struct intel_nhlt_params *nhlt, const char *format, const char *,
++int ssp_hw_set_params(struct intel_nhlt_params *nhlt, const char *format,
++		      const char *mclk ATTRIBUTE_UNUSED,
+ 		      const char *bclk, const char *bclk_invert, const char *fsync,
+ 		      const char *fsync_invert, int mclk_freq, int bclk_freq, int fsync_freq,
+ 		      int tdm_slots, int tdm_slot_width, int tx_slots, int rx_slots)
+diff --git a/topology/nhlt/nhlt-processor.c b/topology/nhlt/nhlt-processor.c
+index 567fa5c..ca539c3 100644
+--- a/topology/nhlt/nhlt-processor.c
++++ b/topology/nhlt/nhlt-processor.c
+@@ -11,6 +11,7 @@
+ #include <string.h>
+ #include <stdbool.h>
+ #include <inttypes.h>
++#include <alsa/global.h>
+ #include <alsa/input.h>
+ #include <alsa/output.h>
+ #include <alsa/conf.h>
+@@ -87,7 +88,8 @@ static void debug_print_nhlt(struct nhlt *blob, struct endpoint_descriptor **eps
+ 	fprintf(stdout, "\n");
+ }
+ #else
+-static void debug_print_nhlt(struct nhlt *, struct endpoint_descriptor **) {}
++static void debug_print_nhlt(struct nhlt *blob ATTRIBUTE_UNUSED,
++			     struct endpoint_descriptor **eps ATTRIBUTE_UNUSED) {}
+ #endif
+ 
+ static int print_as_hex_bytes(uint8_t *manifest_buffer, uint32_t manifest_size,
+@@ -313,7 +315,8 @@ static int nhlt_get_flat_buffer(struct nhlt *blob, struct endpoint_descriptor **
+ }
+ 
+ /* called at the end of topology pre-processing, create flat buffer from variable size nhlt */
+-static int nhlt_create(struct intel_nhlt_params *nhlt, snd_config_t *input, snd_config_t *,
++static int nhlt_create(struct intel_nhlt_params *nhlt, snd_config_t *input,
++		       snd_config_t *output ATTRIBUTE_UNUSED,
+ 		       uint8_t **nhlt_buffer, uint32_t *nhlt_size)
+ {
+ 	struct endpoint_descriptor *eps[MAX_ENDPOINT_COUNT];
+diff --git a/topology/pre-process-class.c b/topology/pre-process-class.c
+index d883d05..bedcebe 100644
+--- a/topology/pre-process-class.c
++++ b/topology/pre-process-class.c
+@@ -127,7 +127,7 @@ snd_config_t *tplg_class_lookup(struct tplg_pre_processor *tplg_pp, snd_config_t
+ }
+ 
+ /* find the attribute config by name in the class definition */
+-snd_config_t *tplg_class_find_attribute_by_name(struct tplg_pre_processor *,
++snd_config_t *tplg_class_find_attribute_by_name(struct tplg_pre_processor *tplg_p ATTRIBUTE_UNUSED,
+ 						snd_config_t *class, const char *name)
+ {
+ 	snd_config_t *attr = NULL;
+@@ -152,7 +152,7 @@ snd_config_t *tplg_class_find_attribute_by_name(struct tplg_pre_processor *,
+ }
+ 
+ /* get the name of the attribute that must have a unique value in the object instance */
+-const char *tplg_class_get_unique_attribute_name(struct tplg_pre_processor *,
++const char *tplg_class_get_unique_attribute_name(struct tplg_pre_processor *tplg_pp ATTRIBUTE_UNUSED,
+ 						 snd_config_t *class)
+ {
+ 	snd_config_t *unique;
+@@ -177,7 +177,7 @@ const char *tplg_class_get_unique_attribute_name(struct tplg_pre_processor *,
+ }
+ 
+ /* get attribute type from the definition */
+-snd_config_type_t tplg_class_get_attribute_type(struct tplg_pre_processor *,
++snd_config_type_t tplg_class_get_attribute_type(struct tplg_pre_processor *tplg_pp ATTRIBUTE_UNUSED,
+ 						snd_config_t *attr)
+ {
+ 	snd_config_t *type;
+@@ -208,7 +208,7 @@ snd_config_type_t tplg_class_get_attribute_type(struct tplg_pre_processor *,
+ }
+ 
+ /* get token_ref for attribute with name attr_name in the class */
+-const char *tplg_class_get_attribute_token_ref(struct tplg_pre_processor *,
++const char *tplg_class_get_attribute_token_ref(struct tplg_pre_processor *tplg_pp ATTRIBUTE_UNUSED,
+ 					       snd_config_t *class, const char *attr_name)
+ {
+ 	snd_config_t *attributes, *attr, *token_ref;
+@@ -235,7 +235,7 @@ const char *tplg_class_get_attribute_token_ref(struct tplg_pre_processor *,
+ }
+ 
+ /* convert a valid attribute string value to the corresponding tuple value */
+-long tplg_class_attribute_valid_tuple_value(struct tplg_pre_processor *,
++long tplg_class_attribute_valid_tuple_value(struct tplg_pre_processor *tplg_pp ATTRIBUTE_UNUSED,
+ 					    snd_config_t *class, snd_config_t *attr)
+ {
+ 
+diff --git a/topology/pre-process-object.c b/topology/pre-process-object.c
+index 48555e7..61cc85f 100644
+--- a/topology/pre-process-object.c
++++ b/topology/pre-process-object.c
+@@ -31,7 +31,8 @@
+ 
+ /* Parse VendorToken object, create the "SectionVendorToken" and save it */
+ int tplg_build_vendor_token_object(struct tplg_pre_processor *tplg_pp,
+-				   snd_config_t *obj_cfg, snd_config_t *)
++				   snd_config_t *obj_cfg,
++				   snd_config_t *parent ATTRIBUTE_UNUSED)
+ {
+ 	snd_config_iterator_t i, next;
+ 	snd_config_t *vtop, *n, *obj;
+@@ -196,7 +197,7 @@ int tplg_build_data_object(struct tplg_pre_processor *tplg_pp, snd_config_t *obj
+ 	return tplg_parent_update(tplg_pp, parent, "data", name);
+ }
+ 
+-static int tplg_create_config_template(struct tplg_pre_processor *,
++static int tplg_create_config_template(struct tplg_pre_processor *tplg_pp ATTRIBUTE_UNUSED,
+ 				       snd_config_t **template,
+ 				       const struct config_template_items *items)
+ {
+@@ -499,7 +500,7 @@ min_max_check:
+ }
+ 
+ /* get object's name attribute value */
+-const char *tplg_object_get_name(struct tplg_pre_processor *,
++const char *tplg_object_get_name(struct tplg_pre_processor *tplg_pp ATTRIBUTE_UNUSED,
+ 				 snd_config_t *object)
+ {
+ 	snd_config_t *cfg;
+@@ -518,7 +519,7 @@ const char *tplg_object_get_name(struct tplg_pre_processor *,
+ }
+ 
+ /* look up the instance of object in a config */
+-static snd_config_t *tplg_object_lookup_in_config(struct tplg_pre_processor *,
++static snd_config_t *tplg_object_lookup_in_config(struct tplg_pre_processor *tplg_pp ATTRIBUTE_UNUSED,
+ 						  snd_config_t *class, const char *type,
+ 						  const char *class_name, const char *id)
+ {
+@@ -977,7 +978,7 @@ template:
+ }
+ 
+ static int tplg_build_generic_object(struct tplg_pre_processor *tplg_pp, snd_config_t *obj_cfg,
+-				     snd_config_t *)
++				     snd_config_t *parent ATTRIBUTE_UNUSED)
+ {
+ 	snd_config_t *wtop;
+ 	const char *name;
+@@ -1090,7 +1091,7 @@ const struct build_function_map object_build_map[] = {
+ 	 NULL, &pcm_caps_config},
+ };
+ 
+-static const struct build_function_map *tplg_object_get_map(struct tplg_pre_processor *,
++static const struct build_function_map *tplg_object_get_map(struct tplg_pre_processor *tplg_pp ATTRIBUTE_UNUSED,
+ 							    snd_config_t *obj)
+ {
+ 	snd_config_iterator_t first;
+@@ -1145,7 +1146,7 @@ snd_config_t *tplg_object_get_section(struct tplg_pre_processor *tplg_pp, snd_co
+ }
+ 
+ /* return 1 if attribute not found in search_config, 0 on success and negative value on error */
+-static int tplg_object_copy_and_add_param(struct tplg_pre_processor *,
++static int tplg_object_copy_and_add_param(struct tplg_pre_processor *tplg_pp ATTRIBUTE_UNUSED,
+ 					  snd_config_t *obj,
+ 					  snd_config_t *attr_cfg,
+ 					  snd_config_t *search_config)
+@@ -1351,8 +1352,8 @@ static int tplg_object_pre_process_children(struct tplg_pre_processor *tplg_pp,
+ 	return 0;
+ }
+ 
+-static int tplg_construct_object_name(struct tplg_pre_processor *, snd_config_t *obj,
+-				      snd_config_t *class_cfg)
++static int tplg_construct_object_name(struct tplg_pre_processor *tplg_pp ATTRIBUTE_UNUSED,
++				      snd_config_t *obj, snd_config_t *class_cfg)
+ {
+ 	snd_config_iterator_t i, next;
+ 	snd_config_t *args, *n;
+@@ -1547,7 +1548,7 @@ static int tplg_object_set_unique_attribute(struct tplg_pre_processor *tplg_pp,
+  * Helper function to get object instance config which is 2 nodes down from class_type config.
+  * ex: Get the pointer to the config node with ID "0" from the input config Widget.pga.0 {}
+  */
+-snd_config_t *tplg_object_get_instance_config(struct tplg_pre_processor *,
++snd_config_t *tplg_object_get_instance_config(struct tplg_pre_processor *tplg_pp ATTRIBUTE_UNUSED,
+ 					snd_config_t *class_type)
+ {
+ 	snd_config_iterator_t first;
+diff --git a/topology/pre-processor.c b/topology/pre-processor.c
+index 3903dee..01f8a5d 100644
+--- a/topology/pre-processor.c
++++ b/topology/pre-processor.c
+@@ -231,8 +231,9 @@ void tplg_pp_config_debug(struct tplg_pre_processor *tplg_pp, snd_config_t *cfg)
+ 	snd_config_save(cfg, tplg_pp->dbg_output);
+ }
+ #else
+-void tplg_pp_debug(char *, ...) {}
+-void tplg_pp_config_debug(struct tplg_pre_processor *, snd_config_t *){}
++void tplg_pp_debug(char *fmt ATTRIBUTE_UNUSED, ...) {}
++void tplg_pp_config_debug(struct tplg_pre_processor *tplg_pp ATTRIBUTE_UNUSED,
++			  snd_config_t *cfg ATTRIBUTE_UNUSED) {}
+ #endif
+ 
+ static int pre_process_config(struct tplg_pre_processor *tplg_pp, snd_config_t *cfg)
+@@ -640,8 +641,9 @@ static int pre_process_includes_all(struct tplg_pre_processor *tplg_pp, snd_conf
+ }
+ 
+ /* duplicate the existing objects in src into dest and update with new attribute */
+-static int pre_process_add_objects(struct tplg_pre_processor *, int *object_count,
+-				   snd_config_t *src, snd_config_t *dest, snd_config_t *attr_cfg)
++static int pre_process_add_objects(struct tplg_pre_processor *tplg_pp ATTRIBUTE_UNUSED,
++				   int *object_count, snd_config_t *src,
++				   snd_config_t *dest, snd_config_t *attr_cfg)
+ {
+ 	snd_config_iterator_t i, next;
+ 	int ret;
+-- 
+2.41.0
+
+
+From 8c229270f6bae83b705a03714c46067a7aa57b02 Mon Sep 17 00:00:00 2001
+From: Michael Opdenacker <michael.opdenacker@bootlin.com>
+Date: Tue, 19 Sep 2023 13:14:29 +0200
+Subject: [PATCH 09/18] topology: include locale.h
+
+This solves an issue compiling with the musl libc.
+
+Fixes: https://github.com/alsa-project/alsa-utils/issues/239
+Signed-off-by: Michael Opdenacker <michael.opdenacker@bootlin.com>
+Signed-off-by: Jaroslav Kysela <perex@perex.cz>
+---
+ topology/topology.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/topology/topology.c b/topology/topology.c
+index 1840ffe..5d03a8b 100644
+--- a/topology/topology.c
++++ b/topology/topology.c
+@@ -32,6 +32,7 @@
+ #include <sys/stat.h>
+ #include <getopt.h>
+ #include <assert.h>
++#include <locale.h>
+ 
+ #include <alsa/asoundlib.h>
+ #include <alsa/topology.h>
+-- 
+2.41.0
+
+
+From 0925ad7f09b2dc77015784f9ac2f5e34dd0dd5c3 Mon Sep 17 00:00:00 2001
+From: Michael Opdenacker <michael.opdenacker@bootlin.com>
+Date: Tue, 19 Sep 2023 13:14:30 +0200
+Subject: [PATCH 10/18] nhlt-dmic-info.c: include sys/types.h
+
+This fixes an issue compiling with the musl libc.
+
+Fixes: https://github.com/alsa-project/alsa-utils/issues/238
+Signed-off-by: Michael Opdenacker <michael.opdenacker@bootlin.com>
+Signed-off-by: Jaroslav Kysela <perex@perex.cz>
+---
+ nhlt/nhlt-dmic-info.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/nhlt/nhlt-dmic-info.c b/nhlt/nhlt-dmic-info.c
+index 3f6c64d..331555a 100644
+--- a/nhlt/nhlt-dmic-info.c
++++ b/nhlt/nhlt-dmic-info.c
+@@ -33,6 +33,7 @@
+ #include <fcntl.h>
+ #include <getopt.h>
+ #include <sys/stat.h>
++#include <sys/types.h>
+ #include <arpa/inet.h>
+ 
+ int debug = 0;
+-- 
+2.41.0
+
+
+From 68dd54784a0b2287015433a62600b28bbff49399 Mon Sep 17 00:00:00 2001
+From: Ranjani Sridharan <ranjani.sridharan@linux.intel.com>
+Date: Mon, 11 Sep 2023 08:18:15 -0700
+Subject: [PATCH 11/18] topology: pre-processor: Add support for enum controls
+
+Add support for adding enum controls in the topology pre-processor.
+
+Closes: https://github.com/alsa-project/alsa-utils/pull/236
+Signed-off-by: Ranjani Sridharan <ranjani.sridharan@linux.intel.com>
+Signed-off-by: Jaroslav Kysela <perex@perex.cz>
+---
+ topology/pre-process-dapm.c   | 26 ++++++++++++++++++++++++++
+ topology/pre-process-object.c | 14 +++++++++++++-
+ topology/pre-processor.h      |  4 ++++
+ 3 files changed, 43 insertions(+), 1 deletion(-)
+
+diff --git a/topology/pre-process-dapm.c b/topology/pre-process-dapm.c
+index 9355a86..78944a6 100644
+--- a/topology/pre-process-dapm.c
++++ b/topology/pre-process-dapm.c
+@@ -70,6 +70,26 @@ int tplg_build_channel_object(struct tplg_pre_processor *tplg_pp, snd_config_t *
+ 	return tplg_build_base_object(tplg_pp, obj_cfg, parent, false);
+ }
+ 
++int tplg_build_text_object(struct tplg_pre_processor *tplg_pp, snd_config_t *obj_cfg,
++			   snd_config_t *parent)
++{
++	snd_config_t *cfg;
++	const char *name;
++	int ret;
++
++	cfg = tplg_object_get_instance_config(tplg_pp, obj_cfg);
++
++	name = tplg_object_get_name(tplg_pp, cfg);
++	if (!name)
++		return -EINVAL;
++
++	ret = tplg_build_object_from_template(tplg_pp, obj_cfg, &cfg, NULL, false);
++	if (ret < 0)
++		return ret;
++
++	return tplg_parent_update(tplg_pp, parent, "texts", name);
++}
++
+ int tplg_build_tlv_object(struct tplg_pre_processor *tplg_pp, snd_config_t *obj_cfg,
+ 			      snd_config_t *parent)
+ {
+@@ -131,6 +151,12 @@ int tplg_build_bytes_control(struct tplg_pre_processor *tplg_pp, snd_config_t *o
+ 	return tplg_build_control(tplg_pp, obj_cfg, parent, "bytes");
+ }
+ 
++int tplg_build_enum_control(struct tplg_pre_processor *tplg_pp, snd_config_t *obj_cfg,
++			     snd_config_t *parent)
++{
++	return tplg_build_control(tplg_pp, obj_cfg, parent, "enum");
++}
++
+ /*
+  * Widget names for pipeline endpoints can be of the following type:
+  * "class.<constructor args separated by .> ex: pga.0.1, buffer.1.1 etc
+diff --git a/topology/pre-process-object.c b/topology/pre-process-object.c
+index 61cc85f..34b9203 100644
+--- a/topology/pre-process-object.c
++++ b/topology/pre-process-object.c
+@@ -117,7 +117,7 @@ int tplg_parent_update(struct tplg_pre_processor *tplg_pp, snd_config_t *parent,
+ 		return ret;
+ 
+ 	/* get section config */
+-	if (!strcmp(section_name, "tlv")) {
++	if (!strcmp(section_name, "tlv") || !strcmp(section_name, "texts")) {
+ 		/* set tlv name if config exists already */
+ 		ret = snd_config_search(cfg, section_name, &item_config);
+ 			if (ret < 0) {
+@@ -1038,6 +1038,15 @@ const struct config_template_items bytes_control_config = {
+ 	.compound_config_ids = {"access"}
+ };
+ 
++const struct config_template_items enum_control_config = {
++	.int_config_ids = {"index"},
++	.compound_config_ids = {"access"}
++};
++
++const struct config_template_items text_config = {
++	.compound_config_ids = {"values"}
++};
++
+ const struct config_template_items scale_config = {
+ 	.int_config_ids = {"min", "step", "mute"},
+ };
+@@ -1073,6 +1082,7 @@ const struct build_function_map object_build_map[] = {
+ 	{"Base", "ops", "ops" ,&tplg_build_ops_object, NULL, &ops_config},
+ 	{"Base", "extops", "extops" ,&tplg_build_ops_object, NULL, &ops_config},
+ 	{"Base", "channel", "channel", &tplg_build_channel_object, NULL, &channel_config},
++	{"Base", "text", "SectionText", &tplg_build_text_object, NULL, &text_config},
+ 	{"Base", "VendorToken", "SectionVendorTokens", &tplg_build_vendor_token_object,
+ 	 NULL, NULL},
+ 	{"Base", "hw_config", "SectionHWConfig", &tplg_build_hw_cfg_object, NULL,
+@@ -1085,6 +1095,8 @@ const struct build_function_map object_build_map[] = {
+ 	 &mixer_control_config},
+ 	{"Control", "bytes", "SectionControlBytes", &tplg_build_bytes_control, NULL,
+ 	 &bytes_control_config},
++	 {"Control", "enum", "SectionControlEnum", &tplg_build_enum_control, NULL,
++	 &enum_control_config},
+ 	{"Dai", "", "SectionBE", &tplg_build_generic_object, NULL, &be_dai_config},
+ 	{"PCM", "pcm", "SectionPCM", &tplg_build_generic_object, NULL, &pcm_config},
+ 	{"PCM", "pcm_caps", "SectionPCMCapabilities", &tplg_build_pcm_caps_object,
+diff --git a/topology/pre-processor.h b/topology/pre-processor.h
+index 878653d..3a8a4bc 100644
+--- a/topology/pre-processor.h
++++ b/topology/pre-processor.h
+@@ -70,6 +70,10 @@ int tplg_build_mixer_control(struct tplg_pre_processor *tplg_pp, snd_config_t *o
+ 			      snd_config_t *parent);
+ int tplg_build_bytes_control(struct tplg_pre_processor *tplg_pp, snd_config_t *obj_cfg,
+ 			      snd_config_t *parent);
++int tplg_build_enum_control(struct tplg_pre_processor *tplg_pp, snd_config_t *obj_cfg,
++			     snd_config_t *parent);
++int tplg_build_text_object(struct tplg_pre_processor *tplg_pp, snd_config_t *obj_cfg,
++			   snd_config_t *parent);
+ int tplg_build_dapm_route_object(struct tplg_pre_processor *tplg_pp, snd_config_t *obj_cfg,
+ 			      snd_config_t *parent);
+ int tplg_build_hw_cfg_object(struct tplg_pre_processor *tplg_pp,
+-- 
+2.41.0
+
+
+From 31e91f911e9132171a87fb7966c3f4701ff9717c Mon Sep 17 00:00:00 2001
+From: Bernd Kuhls <bernd@kuhls.net>
+Date: Fri, 13 Oct 2023 20:32:32 +0200
+Subject: [PATCH 12/18] configure.ac: fix UMP support detection
+
+https://github.com/alsa-project/alsa-utils/commit/b399fb85a919636b7da34e8bcf17f484dd9046f7
+added usage of alsa/ump_msg.h without checking whether alsa-lib was
+compiled with rawmidi support:
+https://github.com/alsa-project/alsa-lib/blob/master/include/Makefile.am#L37
+
+Fixes a build error when alsa-lib was compiled with --disable-rawmidi
+
+aplaymidi.c:34:10: fatal error: alsa/ump_msg.h: No such file or directory
+   34 | #include <alsa/ump_msg.h>
+
+Closes: https://github.com/alsa-project/alsa-utils/pull/240
+Signed-off-by: Bernd Kuhls <bernd@kuhls.net>
+Signed-off-by: Jaroslav Kysela <perex@perex.cz>
+---
+ configure.ac | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/configure.ac b/configure.ac
+index beb4963..4217741 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -55,7 +55,7 @@ if test "$HAVE_SEQ_CLIENT_INFO_GET_PID" = "yes" ; then
+     AC_DEFINE([HAVE_SEQ_CLIENT_INFO_GET_PID], 1, [alsa-lib supports snd_seq_client_info_get_pid])
+ fi
+ AC_CHECK_LIB([asound], [snd_seq_client_info_get_midi_version], [HAVE_SEQ_CLIENT_INFO_GET_MIDI_VERSION="yes"])
+-if test "$HAVE_SEQ_CLIENT_INFO_GET_MIDI_VERSION" = "yes" ; then
++if test "$HAVE_SEQ_CLIENT_INFO_GET_MIDI_VERSION" = "yes" -a "$have_rawmidi" = "yes"; then
+     AC_DEFINE([HAVE_SEQ_CLIENT_INFO_GET_MIDI_VERSION], 1, [alsa-lib supports snd_seq_client_info_get_midi_version])
+ fi
+ AC_CHECK_LIB([atopology], [snd_tplg_save], [have_topology="yes"], [have_topology="no"])
+-- 
+2.41.0
+
+
+From 039e4cad48a01437d195914b57b5da83ebc582c3 Mon Sep 17 00:00:00 2001
+From: Delio Brignoli <dbrignoli@audioscience.com>
+Date: Mon, 18 Sep 2023 09:33:37 +0100
+Subject: [PATCH 13/18] bat: really skip analysis of the first period and
+ update related comment
+
+Prior to this change bat/analyze.c would skip the last period of the recording, contrary to
+what the comment in the code which stated the first period was meant to be skipped.
+
+The comment has been updated to state that both the first and last period are skipped and the code
+has been updated to match.
+
+Closes: https://github.com/alsa-project/alsa-utils/pull/237
+Signed-off-by: Delio Brignoli <dbrignoli@audioscience.com>
+Signed-off-by: Jaroslav Kysela <perex@perex.cz>
+---
+ bat/analyze.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/bat/analyze.c b/bat/analyze.c
+index 6867880..b8d0270 100644
+--- a/bat/analyze.c
++++ b/bat/analyze.c
+@@ -299,7 +299,7 @@ static int calculate_noise(struct bat *bat, float *src, int channel)
+ 	/* each section has 2 sine periods, the first one for locating
+ 	 * and the second one for noise calculating */
+ 	int nsamples_per_section = nsamples * 2;
+-	/* all sine periods will be calculated except the first one */
++	/* all sine periods will be calculated except the first and last one */
+ 	int nsection = bat->frames / nsamples - 1;
+ 
+ 	fprintf(bat->log, _("samples per period: %d\n"), nsamples);
+@@ -331,7 +331,7 @@ static int calculate_noise(struct bat *bat, float *src, int channel)
+ 	/* calculate average noise level */
+ 	sum_snr_pc = 0.0;
+ 	cnt_clean = cnt_noise = 0;
+-	for (i = 0, offset = 0; i < nsection; i++) {
++	for (i = 1, offset = nsamples; i < nsection; i++) {
+ 		na.snr_db = SNR_DB_INVALID;
+ 
+ 		err = calculate_noise_one_period(bat, &na, src + offset,
+-- 
+2.41.0
+
+
+From d272c5d935b2ff8acc00f16317f1f960b02ed3a1 Mon Sep 17 00:00:00 2001
+From: Sam James <sam@gentoo.org>
+Date: Thu, 7 Sep 2023 21:23:51 +0100
+Subject: [PATCH 14/18] topology: add include for ENABLE_NLS on musl
+
+Needed for setlocale().
+
+(After rebasing to pick up 8c229270f6bae83b705a03714c46067a7aa57b02, just
+move it to be guarded as the include now exists.)
+
+Closes: https://github.com/alsa-project/alsa-utils/pull/234
+Signed-off-by: Sam James <sam@gentoo.org>
+Signed-off-by: Jaroslav Kysela <perex@perex.cz>
+---
+ topology/topology.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/topology/topology.c b/topology/topology.c
+index 5d03a8b..98b000a 100644
+--- a/topology/topology.c
++++ b/topology/topology.c
+@@ -32,11 +32,13 @@
+ #include <sys/stat.h>
+ #include <getopt.h>
+ #include <assert.h>
+-#include <locale.h>
+ 
+ #include <alsa/asoundlib.h>
+ #include <alsa/topology.h>
+ #include "gettext.h"
++#ifdef ENABLE_NLS
++#include <locale.h>
++#endif
+ #include "version.h"
+ #include "topology.h"
+ 
+-- 
+2.41.0
+
+
+From c08d580b281bd5965585bf09b45ba3a582202931 Mon Sep 17 00:00:00 2001
+From: Sam James <sam@gentoo.org>
+Date: Thu, 7 Sep 2023 21:24:16 +0100
+Subject: [PATCH 15/18] nhlt: use stdint.h types
+
+u_int_* aren't standard, but uint* are. Use those instead for musl compat.
+
+Closes: https://github.com/alsa-project/alsa-utils/pull/234
+Bug: https://bugs.gentoo.org/913758
+Signed-off-by: Sam James <sam@gentoo.org>
+Signed-off-by: Jaroslav Kysela <perex@perex.cz>
+---
+ nhlt/nhlt-dmic-info.c | 28 ++++++++++++++--------------
+ 1 file changed, 14 insertions(+), 14 deletions(-)
+
+diff --git a/nhlt/nhlt-dmic-info.c b/nhlt/nhlt-dmic-info.c
+index 331555a..eadf21a 100644
+--- a/nhlt/nhlt-dmic-info.c
++++ b/nhlt/nhlt-dmic-info.c
+@@ -46,7 +46,7 @@ int debug = 0;
+ #define NHLT_EP_HDR_SIZE (4 + 1 + 1 + 2 + 2 + 2 + 4 + 1 + 1 + 1)
+ #define VENDOR_MIC_CFG_SIZE (1 + 1 + 2 + 2 + 2 + 1 + 1 + 2 + 2 + 2 + 2 + 2 + 2)
+ 
+-static const char *microphone_type(u_int8_t type)
++static const char *microphone_type(uint8_t type)
+ {
+ 	switch (type) {
+ 	case 0: return "omnidirectional";
+@@ -60,7 +60,7 @@ static const char *microphone_type(u_int8_t type)
+ 	return "unknown";
+ }
+ 
+-static const char *microphone_location(u_int8_t location)
++static const char *microphone_location(uint8_t location)
+ {
+ 	switch (location) {
+ 	case 0: return "laptop-top-panel";
+@@ -74,21 +74,21 @@ static const char *microphone_location(u_int8_t location)
+ }
+ 
+ 
+-static inline u_int8_t get_u8(u_int8_t *base, u_int32_t off)
++static inline uint8_t get_u8(uint8_t *base, uint32_t off)
+ {
+ 	return *(base + off);
+ }
+ 
+-static inline int32_t get_s16le(u_int8_t *base, u_int32_t off)
++static inline int32_t get_s16le(uint8_t *base, uint32_t off)
+ {
+-	u_int32_t v =  *(base + off + 0) |
++	uint32_t v =  *(base + off + 0) |
+ 		      (*(base + off + 1) << 8);
+ 	if (v & 0x8000)
+ 		return -((int32_t)0x10000 - (int32_t)v);
+ 	return v;
+ }
+ 
+-static inline u_int32_t get_u32le(u_int8_t *base, u_int32_t off)
++static inline uint32_t get_u32le(uint8_t *base, uint32_t off)
+ {
+ 	return   *(base + off + 0) |
+ 		(*(base + off + 1) << 8) |
+@@ -138,10 +138,10 @@ static int nhlt_dmic_config(FILE *out, uint8_t *dmic, uint8_t mic)
+ 	return 0;
+ }
+ 
+-static int nhlt_dmic_ep_to_json(FILE *out, uint8_t *ep, u_int32_t ep_size)
++static int nhlt_dmic_ep_to_json(FILE *out, uint8_t *ep, uint32_t ep_size)
+ {
+-	u_int32_t off, specific_cfg_size;
+-	u_int8_t config_type, array_type, mic, num_mics;
++	uint32_t off, specific_cfg_size;
++	uint8_t config_type, array_type, mic, num_mics;
+ 	int res;
+ 
+ 	off = NHLT_EP_HDR_SIZE;
+@@ -182,15 +182,15 @@ oob:
+ 	return -EINVAL;
+ }
+ 
+-static int nhlt_table_to_json(FILE *out, u_int8_t *nhlt, u_int32_t size)
++static int nhlt_table_to_json(FILE *out, uint8_t *nhlt, uint32_t size)
+ {
+-	u_int32_t _size, off, ep_size;
+-	u_int8_t sum = 0, ep, ep_count, link_type, dmics = 0;
++	uint32_t _size, off, ep_size;
++	uint8_t sum = 0, ep, ep_count, link_type, dmics = 0;
+ 	int res;
+ 
+ 	_size = get_u32le(nhlt, 4);
+ 	if (_size != size) {
+-		fprintf(stderr, "Table size mismatch (%08x != %08x)\n", _size, (u_int32_t)size);
++		fprintf(stderr, "Table size mismatch (%08x != %08x)\n", _size, (uint32_t)size);
+ 		return -EINVAL;
+ 	}
+ 	for (off = 0; off < size; off++)
+@@ -232,7 +232,7 @@ oob:
+ static int nhlt_to_json(FILE *out, const char *nhlt_file)
+ {
+ 	struct stat st;
+-	u_int8_t *buf;
++	uint8_t *buf;
+ 	int _errno, fd, res;
+ 	size_t pos, size;
+ 	ssize_t ret;
+-- 
+2.41.0
+
+
+From 5ae01fcf270864d379eefd81f1abc5b71907a72b Mon Sep 17 00:00:00 2001
+From: Sam James <sam@gentoo.org>
+Date: Sat, 30 Sep 2023 10:09:46 +0100
+Subject: [PATCH 16/18] Revert "nhlt-dmic-info.c: include sys/types.h"
+
+This reverts commit 0925ad7f09b2dc77015784f9ac2f5e34dd0dd5c3.
+
+This isn't necessary now that we use standard types (sys/types.h just
+defines some compatibility typedefs).
+
+Closes: https://github.com/alsa-project/alsa-utils/pull/234
+Signed-off-by: Sam James <sam@gentoo.org>
+Signed-off-by: Jaroslav Kysela <perex@perex.cz>
+---
+ nhlt/nhlt-dmic-info.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/nhlt/nhlt-dmic-info.c b/nhlt/nhlt-dmic-info.c
+index eadf21a..f1b0857 100644
+--- a/nhlt/nhlt-dmic-info.c
++++ b/nhlt/nhlt-dmic-info.c
+@@ -33,7 +33,6 @@
+ #include <fcntl.h>
+ #include <getopt.h>
+ #include <sys/stat.h>
+-#include <sys/types.h>
+ #include <arpa/inet.h>
+ 
+ int debug = 0;
+-- 
+2.41.0
+
+
+From 37447085c6fc975d191ecb508931a67bce79233d Mon Sep 17 00:00:00 2001
+From: Jaroslav Kysela <perex@perex.cz>
+Date: Tue, 17 Oct 2023 13:44:03 +0200
+Subject: [PATCH 17/18] aplay: use stdint.h types instead u_int/u_short/u_char
+
+Closes: https://github.com/alsa-project/alsa-utils/pull/234
+Signed-off-by: Jaroslav Kysela <perex@perex.cz>
+---
+ aplay/aplay.c   | 92 ++++++++++++++++++++++++-------------------------
+ aplay/formats.h | 70 ++++++++++++++++++-------------------
+ 2 files changed, 81 insertions(+), 81 deletions(-)
+
+diff --git a/aplay/aplay.c b/aplay/aplay.c
+index f180d42..9cf36de 100644
+--- a/aplay/aplay.c
++++ b/aplay/aplay.c
+@@ -29,6 +29,7 @@
+ #define _GNU_SOURCE
+ #include "aconfig.h"
+ #include <stdio.h>
++#include <stdint.h>
+ #if HAVE_MALLOC_H
+ #include <malloc.h>
+ #endif
+@@ -50,7 +51,6 @@
+ #include <sys/uio.h>
+ #include <sys/time.h>
+ #include <sys/stat.h>
+-#include <sys/types.h>
+ #include <endian.h>
+ #include "gettext.h"
+ #include "formats.h"
+@@ -114,7 +114,7 @@ static int mmap_flag = 0;
+ static int interleaved = 1;
+ static int nonblock = 0;
+ static volatile sig_atomic_t in_aborting = 0;
+-static u_char *audiobuf = NULL;
++static uint8_t *audiobuf = NULL;
+ static snd_pcm_uframes_t chunk_size = 0;
+ static unsigned period_time = 0;
+ static unsigned buffer_time = 0;
+@@ -859,7 +859,7 @@ int main(int argc, char *argv[])
+ 	chunk_size = 1024;
+ 	hwparams = rhwparams;
+ 
+-	audiobuf = (u_char *)malloc(1024);
++	audiobuf = (uint8_t *)malloc(1024);
+ 	if (audiobuf == NULL) {
+ 		error(_("not enough memory"));
+ 		return 1;
+@@ -970,7 +970,7 @@ static int test_vocfile(void *buffer)
+  * helper for test_wavefile
+  */
+ 
+-static size_t test_wavefile_read(int fd, u_char *buffer, size_t *size, size_t reqsize, int line)
++static size_t test_wavefile_read(int fd, uint8_t *buffer, size_t *size, size_t reqsize, int line)
+ {
+ 	if (*size >= reqsize)
+ 		return *size;
+@@ -995,17 +995,17 @@ static size_t test_wavefile_read(int fd, u_char *buffer, size_t *size, size_t re
+  *                            == 0 if not
+  * Value returned is bytes to be discarded.
+  */
+-static ssize_t test_wavefile(int fd, u_char *_buffer, size_t size)
++static ssize_t test_wavefile(int fd, uint8_t *_buffer, size_t size)
+ {
+ 	WaveHeader *h = (WaveHeader *)_buffer;
+-	u_char *buffer = NULL;
++	uint8_t *buffer = NULL;
+ 	size_t blimit = 0;
+ 	WaveFmtBody *f;
+ 	WaveChunkHeader *c;
+-	u_int type, len;
++	uint32_t type, len;
+ 	unsigned short format, channels;
+ 	int big_endian, native_format;
+-	u_char vbps = 0;
++	uint8_t vbps = 0;
+ 
+ 	if (size < sizeof(WaveHeader))
+ 		return -1;
+@@ -1044,7 +1044,7 @@ static ssize_t test_wavefile(int fd, u_char *_buffer, size_t size)
+ 
+ 	if (len < sizeof(WaveFmtBody)) {
+ 		error(_("unknown length of 'fmt ' chunk (read %u, should be %u at least)"),
+-		      len, (u_int)sizeof(WaveFmtBody));
++		      len, (uint32_t)sizeof(WaveFmtBody));
+ 		prg_exit(EXIT_FAILURE);
+ 	}
+ 	check_wavefile_space(buffer, len, blimit);
+@@ -1055,7 +1055,7 @@ static ssize_t test_wavefile(int fd, u_char *_buffer, size_t size)
+ 		WaveFmtExtensibleBody *fe = (WaveFmtExtensibleBody*)buffer;
+ 		if (len < sizeof(WaveFmtExtensibleBody)) {
+ 			error(_("unknown length of extensible 'fmt ' chunk (read %u, should be %u at least)"),
+-					len, (u_int)sizeof(WaveFmtExtensibleBody));
++					len, (unsigned int)sizeof(WaveFmtExtensibleBody));
+ 			prg_exit(EXIT_FAILURE);
+ 		}
+ 		if (memcmp(fe->guid_tag, WAV_GUID_TAG, 14) != 0) {
+@@ -1167,7 +1167,7 @@ static ssize_t test_wavefile(int fd, u_char *_buffer, size_t size)
+ 	size -= len;
+ 	
+ 	while (1) {
+-		u_int type, len;
++		uint32_t type, len;
+ 
+ 		check_wavefile_space(buffer, sizeof(WaveChunkHeader), blimit);
+ 		test_wavefile_read(fd, buffer, &size, sizeof(WaveChunkHeader), __LINE__);
+@@ -1809,7 +1809,7 @@ static void print_vu_meter(signed int *perc, signed int *maxperc)
+ }
+ 
+ /* peak handler */
+-static void compute_max_peak(u_char *data, size_t samples)
++static void compute_max_peak(uint8_t *data, size_t samples)
+ {
+ 	signed int val, max, perc[2], max_peak[2];
+ 	static int run = 0;
+@@ -2054,9 +2054,9 @@ static void do_test_position(void)
+ /*
+  */
+ #ifdef CONFIG_SUPPORT_CHMAP
+-static u_char *remap_data(u_char *data, size_t count)
++static uint8_t *remap_data(uint8_t *data, size_t count)
+ {
+-	static u_char *tmp, *src, *dst;
++	static uint8_t *tmp, *src, *dst;
+ 	static size_t tmp_size;
+ 	size_t sample_bytes = bits_per_sample / 8;
+ 	size_t step = bits_per_frame / 8;
+@@ -2090,9 +2090,9 @@ static u_char *remap_data(u_char *data, size_t count)
+ 	return tmp;
+ }
+ 
+-static u_char **remap_datav(u_char **data, size_t count ATTRIBUTE_UNUSED)
++static uint8_t **remap_datav(uint8_t **data, size_t count ATTRIBUTE_UNUSED)
+ {
+-	static u_char **tmp;
++	static uint8_t **tmp;
+ 	unsigned int ch;
+ 
+ 	if (!hw_map)
+@@ -2118,7 +2118,7 @@ static u_char **remap_datav(u_char **data, size_t count ATTRIBUTE_UNUSED)
+  *  write function
+  */
+ 
+-static ssize_t pcm_write(u_char *data, size_t count)
++static ssize_t pcm_write(uint8_t *data, size_t count)
+ {
+ 	ssize_t r;
+ 	ssize_t result = 0;
+@@ -2157,7 +2157,7 @@ static ssize_t pcm_write(u_char *data, size_t count)
+ 	return result;
+ }
+ 
+-static ssize_t pcm_writev(u_char **data, unsigned int channels, size_t count)
++static ssize_t pcm_writev(uint8_t **data, unsigned int channels, size_t count)
+ {
+ 	ssize_t r;
+ 	size_t result = 0;
+@@ -2210,7 +2210,7 @@ static ssize_t pcm_writev(u_char **data, unsigned int channels, size_t count)
+  *  read function
+  */
+ 
+-static ssize_t pcm_read(u_char *data, size_t rcount)
++static ssize_t pcm_read(uint8_t *data, size_t rcount)
+ {
+ 	ssize_t r;
+ 	size_t result = 0;
+@@ -2252,7 +2252,7 @@ abort:
+ 	return result > rcount ? rcount : result;
+ }
+ 
+-static ssize_t pcm_readv(u_char **data, unsigned int channels, size_t rcount)
++static ssize_t pcm_readv(uint8_t **data, unsigned int channels, size_t rcount)
+ {
+ 	ssize_t r;
+ 	size_t result = 0;
+@@ -2304,7 +2304,7 @@ abort:
+  *  ok, let's play a .voc file
+  */
+ 
+-static ssize_t voc_pcm_write(u_char *data, size_t count)
++static ssize_t voc_pcm_write(uint8_t *data, size_t count)
+ {
+ 	ssize_t result = count, r;
+ 	size_t size;
+@@ -2329,9 +2329,9 @@ static ssize_t voc_pcm_write(u_char *data, size_t count)
+ static void voc_write_silence(unsigned x)
+ {
+ 	unsigned l;
+-	u_char *buf;
++	uint8_t *buf;
+ 
+-	buf = (u_char *) malloc(chunk_bytes);
++	buf = (uint8_t *) malloc(chunk_bytes);
+ 	if (buf == NULL) {
+ 		error(_("can't allocate buffer for silence"));
+ 		return;		/* not fatal error */
+@@ -2372,15 +2372,15 @@ static void voc_play(int fd, int ofs, char *name)
+ 	VocVoiceData *vd;
+ 	VocExtBlock *eb;
+ 	size_t nextblock, in_buffer;
+-	u_char *data, *buf;
++	uint8_t *data, *buf;
+ 	char was_extended = 0, output = 0;
+-	u_short *sp, repeat = 0;
++	uint16_t *sp, repeat = 0;
+ 	off_t filepos = 0;
+ 
+ #define COUNT(x)	nextblock -= x; in_buffer -= x; data += x
+ #define COUNT1(x)	in_buffer -= x; data += x
+ 
+-	data = buf = (u_char *)malloc(64 * 1024);
++	data = buf = (uint8_t *)malloc(64 * 1024);
+ 	buffer_pos = 0;
+ 	if (data == NULL) {
+ 		error(_("malloc error"));
+@@ -2472,8 +2472,8 @@ static void voc_play(int fd, int ofs, char *name)
+ #endif
+ 				break;
+ 			case 3:	/* a silence block, no data, only a count */
+-				sp = (u_short *) data;
+-				COUNT1(sizeof(u_short));
++				sp = (uint16_t *) data;
++				COUNT1(sizeof(uint16_t));
+ 				hwparams.rate = (int) (*data);
+ 				COUNT1(1);
+ 				hwparams.rate = 1000000 / (256 - hwparams.rate);
+@@ -2488,8 +2488,8 @@ static void voc_play(int fd, int ofs, char *name)
+ 				voc_write_silence(*sp);
+ 				break;
+ 			case 4:	/* a marker for syncronisation, no effect */
+-				sp = (u_short *) data;
+-				COUNT1(sizeof(u_short));
++				sp = (uint16_t *) data;
++				COUNT1(sizeof(uint16_t));
+ #if 0
+ 				d_printf("Marker %d\n", *sp);
+ #endif
+@@ -2503,8 +2503,8 @@ static void voc_play(int fd, int ofs, char *name)
+ 			case 6:	/* repeat marker, says repeatcount */
+ 				/* my specs don't say it: maybe this can be recursive, but
+ 				   I don't think somebody use it */
+-				repeat = *(u_short *) data;
+-				COUNT1(sizeof(u_short));
++				repeat = *(uint16_t *) data;
++				COUNT1(sizeof(uint16_t));
+ #if 0
+ 				d_printf("Repeat loop %d times\n", repeat);
+ #endif
+@@ -2649,14 +2649,14 @@ static void begin_voc(int fd, size_t cnt)
+ 	}
+ 	bt.type = 1;
+ 	cnt += sizeof(VocVoiceData);	/* Channel_data block follows */
+-	bt.datalen = (u_char) (cnt & 0xFF);
+-	bt.datalen_m = (u_char) ((cnt & 0xFF00) >> 8);
+-	bt.datalen_h = (u_char) ((cnt & 0xFF0000) >> 16);
++	bt.datalen = (uint8_t) (cnt & 0xFF);
++	bt.datalen_m = (uint8_t) ((cnt & 0xFF00) >> 8);
++	bt.datalen_h = (uint8_t) ((cnt & 0xFF0000) >> 16);
+ 	if (xwrite(fd, &bt, sizeof(VocBlockType)) != sizeof(VocBlockType)) {
+ 		error(_("write error"));
+ 		prg_exit(EXIT_FAILURE);
+ 	}
+-	vd.tc = (u_char) (256 - (1000000 / hwparams.rate));
++	vd.tc = (uint8_t) (256 - (1000000 / hwparams.rate));
+ 	vd.pack = 0;
+ 	if (xwrite(fd, &vd, sizeof(VocVoiceData)) != sizeof(VocVoiceData)) {
+ 		error(_("write error"));
+@@ -2671,8 +2671,8 @@ static void begin_wave(int fd, size_t cnt)
+ 	WaveFmtBody f;
+ 	WaveChunkHeader cf, cd;
+ 	int bits;
+-	u_int tmp;
+-	u_short tmp2;
++	uint32_t tmp;
++	uint16_t tmp2;
+ 
+ 	/* WAVE cannot handle greater than 32bit (signed?) int */
+ 	if (cnt == (size_t)-2)
+@@ -2715,11 +2715,11 @@ static void begin_wave(int fd, size_t cnt)
+ #if 0
+ 	tmp2 = (samplesize == 8) ? 1 : 2;
+ 	f.byte_p_spl = LE_SHORT(tmp2);
+-	tmp = dsp_speed * hwparams.channels * (u_int) tmp2;
++	tmp = dsp_speed * hwparams.channels * (uint32_t) tmp2;
+ #else
+ 	tmp2 = hwparams.channels * snd_pcm_format_physical_width(hwparams.format) / 8;
+ 	f.byte_p_spl = LE_SHORT(tmp2);
+-	tmp = (u_int) tmp2 * hwparams.rate;
++	tmp = (uint32_t) tmp2 * hwparams.rate;
+ #endif
+ 	f.byte_p_sec = LE_INT(tmp);
+ 	f.bit_p_spl = LE_SHORT(bits);
+@@ -2786,9 +2786,9 @@ static void end_voc(int fd)
+ 	cnt += sizeof(VocVoiceData);	/* Channel_data block follows */
+ 	if (cnt > 0x00ffffff)
+ 		cnt = 0x00ffffff;
+-	bt.datalen = (u_char) (cnt & 0xFF);
+-	bt.datalen_m = (u_char) ((cnt & 0xFF00) >> 8);
+-	bt.datalen_h = (u_char) ((cnt & 0xFF0000) >> 16);
++	bt.datalen = (uint8_t) (cnt & 0xFF);
++	bt.datalen_m = (uint8_t) ((cnt & 0xFF00) >> 8);
++	bt.datalen_h = (uint8_t) ((cnt & 0xFF0000) >> 16);
+ 	if (lseek(fd, length_seek, SEEK_SET) == length_seek)
+ 		xwrite(fd, &bt, sizeof(VocBlockType));
+ }
+@@ -2798,7 +2798,7 @@ static void end_wave(int fd)
+ 	WaveChunkHeader cd;
+ 	off_t length_seek;
+ 	off_t filelen;
+-	u_int rifflen;
++	uint32_t rifflen;
+ 	
+ 	length_seek = sizeof(WaveHeader) +
+ 		      sizeof(WaveChunkHeader) +
+@@ -3339,7 +3339,7 @@ static void playbackv_go(int* fds, unsigned int channels, size_t loaded, off_t c
+ 	size_t vsize;
+ 
+ 	unsigned int channel;
+-	u_char *bufs[channels];
++	uint8_t *bufs[channels];
+ 
+ 	header(rtype, names[0]);
+ 	set_params();
+@@ -3393,7 +3393,7 @@ static void capturev_go(int* fds, unsigned int channels, off_t count, int rtype,
+ 	ssize_t r;
+ 	unsigned int channel;
+ 	size_t vsize;
+-	u_char *bufs[channels];
++	uint8_t *bufs[channels];
+ 
+ 	header(rtype, names[0]);
+ 	set_params();
+diff --git a/aplay/formats.h b/aplay/formats.h
+index 093ab80..d82505e 100644
+--- a/aplay/formats.h
++++ b/aplay/formats.h
+@@ -17,28 +17,28 @@
+                          	((u_long)(bp->datalen_h) << 16) )
+ 
+ typedef struct voc_header {
+-	u_char magic[20];	/* must be MAGIC_STRING */
+-	u_short headerlen;	/* Headerlength, should be 0x1A */
+-	u_short version;	/* VOC-file version */
+-	u_short coded_ver;	/* 0x1233-version */
++	uint8_t magic[20];	/* must be MAGIC_STRING */
++	uint16_t headerlen;	/* Headerlength, should be 0x1A */
++	uint16_t version;	/* VOC-file version */
++	uint16_t coded_ver;	/* 0x1233-version */
+ } VocHeader;
+ 
+ typedef struct voc_blocktype {
+-	u_char type;
+-	u_char datalen;		/* low-byte    */
+-	u_char datalen_m;	/* medium-byte */
+-	u_char datalen_h;	/* high-byte   */
++	uint8_t type;
++	uint8_t datalen;		/* low-byte    */
++	uint8_t datalen_m;	/* medium-byte */
++	uint8_t datalen_h;	/* high-byte   */
+ } VocBlockType;
+ 
+ typedef struct voc_voice_data {
+-	u_char tc;
+-	u_char pack;
++	uint8_t tc;
++	uint8_t pack;
+ } VocVoiceData;
+ 
+ typedef struct voc_ext_block {
+-	u_short tc;
+-	u_char pack;
+-	u_char mode;
++	uint16_t tc;
++	uint8_t pack;
++	uint8_t mode;
+ } VocExtBlock;
+ 
+ /* Definitions for Microsoft WAVE format */
+@@ -85,32 +85,32 @@ typedef struct voc_ext_block {
+    it works on all WAVE-file I have
+  */
+ typedef struct {
+-	u_int magic;		/* 'RIFF' */
+-	u_int length;		/* filelen */
+-	u_int type;		/* 'WAVE' */
++	uint32_t magic;		/* 'RIFF' */
++	uint32_t length;	/* filelen */
++	uint32_t type;		/* 'WAVE' */
+ } WaveHeader;
+ 
+ typedef struct {
+-	u_short format;		/* see WAV_FMT_* */
+-	u_short channels;
+-	u_int sample_fq;	/* frequence of sample */
+-	u_int byte_p_sec;
+-	u_short byte_p_spl;	/* samplesize; 1 or 2 bytes */
+-	u_short bit_p_spl;	/* 8, 12 or 16 bit */
++	uint16_t format;	/* see WAV_FMT_* */
++	uint16_t channels;
++	uint32_t sample_fq;	/* frequence of sample */
++	uint32_t byte_p_sec;
++	uint16_t byte_p_spl;	/* samplesize; 1 or 2 bytes */
++	uint16_t bit_p_spl;	/* 8, 12 or 16 bit */
+ } WaveFmtBody;
+ 
+ typedef struct {
+ 	WaveFmtBody format;
+-	u_short ext_size;
+-	u_short bit_p_spl;
+-	u_int channel_mask;
+-	u_short guid_format;	/* WAV_FMT_* */
+-	u_char guid_tag[14];	/* WAV_GUID_TAG */
++	uint16_t ext_size;
++	uint16_t bit_p_spl;
++	uint32_t channel_mask;
++	uint16_t guid_format;	/* WAV_FMT_* */
++	uint8_t guid_tag[14];	/* WAV_GUID_TAG */
+ } WaveFmtExtensibleBody;
+ 
+ typedef struct {
+-	u_int type;		/* 'data' */
+-	u_int length;		/* samplecount */
++	uint32_t type;		/* 'data' */
++	uint32_t length;	/* samplecount */
+ } WaveChunkHeader;
+ 
+ /* Definitions for Sparc .au header */
+@@ -122,12 +122,12 @@ typedef struct {
+ #define AU_FMT_LIN16		3
+ 
+ typedef struct au_header {
+-	u_int magic;		/* '.snd' */
+-	u_int hdr_size;		/* size of header (min 24) */
+-	u_int data_size;	/* size of data */
+-	u_int encoding;		/* see to AU_FMT_XXXX */
+-	u_int sample_rate;	/* sample rate */
+-	u_int channels;		/* number of channels (voices) */
++	uint32_t magic;		/* '.snd' */
++	uint32_t hdr_size;	/* size of header (min 24) */
++	uint32_t data_size;	/* size of data */
++	uint32_t encoding;	/* see to AU_FMT_XXXX */
++	uint32_t sample_rate;	/* sample rate */
++	uint32_t channels;	/* number of channels (voices) */
+ } AuHeader;
+ 
+ #endif				/* FORMATS */
+-- 
+2.41.0
+
+
+From b5591747fd432d6289c9594a481982a77d357ed5 Mon Sep 17 00:00:00 2001
+From: Jaroslav Kysela <perex@perex.cz>
+Date: Wed, 15 Nov 2023 15:02:31 +0100
+Subject: [PATCH 18/18] alsa-restore.rules: use devnode instead number atribute
+
+Fixes: https://github.com/alsa-project/alsa-utils/issues/244
+Signed-off-by: Jaroslav Kysela <perex@perex.cz>
+---
+ alsactl/90-alsa-restore.rules.in | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/alsactl/90-alsa-restore.rules.in b/alsactl/90-alsa-restore.rules.in
+index c0c1b23..1a411c9 100644
+--- a/alsactl/90-alsa-restore.rules.in
++++ b/alsactl/90-alsa-restore.rules.in
+@@ -2,7 +2,7 @@ ACTION=="add", SUBSYSTEM=="sound", KERNEL=="controlC*", KERNELS!="card*", TEST==
+ GOTO="alsa_restore_end"
+ 
+ LABEL="alsa_restore_go"
+-TEST!="@daemonswitch@", RUN+="@sbindir@/alsactl restore $attr{device/number}"
+-TEST=="@daemonswitch@", RUN+="@sbindir@/alsactl nrestore $attr{device/number}"
++TEST!="@daemonswitch@", RUN+="@sbindir@/alsactl restore $devnode"
++TEST=="@daemonswitch@", RUN+="@sbindir@/alsactl nrestore $devnode"
+ 
+ LABEL="alsa_restore_end"
+-- 
+2.41.0
+
