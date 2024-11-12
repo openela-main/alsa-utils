@@ -1,4 +1,4 @@
-%define   baseversion     1.2.10
+%define   baseversion     1.2.12
 #define   fixversion      .2
 %global   _hardened_build 1
 
@@ -9,7 +9,7 @@ Release: 1%{?dist}
 License: GPLv2+
 URL:     http://www.alsa-project.org/
 Source:  ftp://ftp.alsa-project.org/pub/utils/alsa-utils-%{version}.tar.bz2
-Patch1:  alsa-utils-git.patch
+#Patch1:  alsa-utils-git.patch
 Source4: alsaunmute
 Source5: alsaunmute.1
 Source10: alsa.rules
@@ -65,7 +65,7 @@ Architecture (ALSA) framework and Fast Fourier Transform library.
 
 %prep
 %setup -q -n %{name}-%{version}
-%patch1 -p1 -b .alsa-git
+#patch1 -p1 -b .alsa-git
 
 %build
 autoreconf -vif
@@ -129,6 +129,7 @@ find %{buildroot} -name "*.la" -exec rm {} \;
 %{_bindir}/arecordmidi
 %{_bindir}/aseqdump
 %{_bindir}/aseqnet
+%{_bindir}/aseqsend
 %{_bindir}/axfer
 %{_bindir}/iecset
 %{_bindir}/speaker-test
@@ -150,6 +151,7 @@ find %{buildroot} -name "*.la" -exec rm {} \;
 %{_mandir}/man1/arecordmidi.1.gz
 %{_mandir}/man1/aseqdump.1.gz
 %{_mandir}/man1/aseqnet.1.gz
+%{_mandir}/man1/aseqsend.1.gz
 %{_mandir}/man1/axfer.1.gz
 %{_mandir}/man1/axfer-list.1.gz
 %{_mandir}/man1/axfer-transfer.1.gz
@@ -201,6 +203,9 @@ fi
 %systemd_postun_with_restart alsa-state.service
 
 %changelog
+* Thu Jul  4 2024 Jaroslav Kysela <perex@perex.cz> - 1.2.12-1
+* Updated to 1.2.12
+
 * Tue Dec  5 2023 Jaroslav Kysela <perex@perex.cz> - 1.2.10-1
 * Updated to 1.2.10
 
