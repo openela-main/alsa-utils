@@ -1,12 +1,14 @@
-%define   baseversion     1.2.14
-%define   libversion      1.2.13
-#define   fixversion      .2
+%define   baseversion     1.2.15
+%define   libversion      1.2.15
+%define   fixversion      .2
 %global   _hardened_build 1
+
+%global   utils_patch     0
 
 Summary: Advanced Linux Sound Architecture (ALSA) utilities
 Name:    alsa-utils
 Version: %{baseversion}%{?fixversion}
-Release: 2%{?dist}
+Release: 1%{?dist}
 License: GPLv2+
 URL:     https://www.alsa-project.org/
 Source:  https://ftp.alsa-project.org/files/pub/utils/alsa-utils-%{version}.tar.bz2
@@ -16,7 +18,9 @@ Source11: alsactl.conf
 Source20: alsa-restore.service
 Source22: alsa-state.service
 Patch1:  gettext-version.patch
-#Patch2:  alsa-git.patch
+%if %{utils_patch}
+Patch2:  alsa-git.patch
+%endif
 
 BuildRequires: gcc
 BuildRequires: alsa-lib-devel >= %{libversion}
@@ -67,7 +71,9 @@ Architecture (ALSA) framework and Fast Fourier Transform library.
 %prep
 %setup -q -n %{name}-%{version}
 %patch -P1 -p1 -b .gettext
-#patch -P2 -p1 -b .alsa-git
+%if %{utils_patch}
+%patch -P2 -p1 -b .alsa-git
+%endif
 
 %build
 autoreconf -vif
@@ -121,9 +127,11 @@ find %{buildroot} -name "*.la" -exec rm {} \;
 #{_unitdir}/sound.target.wants/*
 %{alsacfgdir}/init/*
 %{_bindir}/aconnect
+%{_sbindir}/alsactl
 %{_bindir}/alsaloop
 %{_bindir}/alsamixer
 %{_bindir}/alsaunmute
+%{_sbindir}/alsa-info.sh
 %{_bindir}/amidi
 %{_bindir}/amixer
 %{_bindir}/aplay
@@ -137,10 +145,8 @@ find %{buildroot} -name "*.la" -exec rm {} \;
 %{_bindir}/aseqsend
 %{_bindir}/axfer
 %{_bindir}/iecset
-%{_bindir}/speaker-test
 %{_bindir}/nhlt-dmic-info
-%{_sbindir}/*
-%exclude %{_sbindir}/alsabat-test.sh
+%{_bindir}/speaker-test
 %{_datadir}/alsa/
 %{_datadir}/sounds/*
 %{_mandir}/man7/*
@@ -210,6 +216,9 @@ fi
 %systemd_postun_with_restart alsa-state.service
 
 %changelog
+* Thu Jan 22 2026 Jaroslav Kysela <perex@perex.cz> - 1.2.15.2-1
+* Updated to 1.2.15.2
+
 * Tue Jul  1 2025 Jaroslav Kysela <perex@perex.cz> - 1.2.14-2
 * Updated to 1.2.14
 
