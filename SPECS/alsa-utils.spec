@@ -1,6 +1,6 @@
-%define   baseversion     1.2.15
-%define   libversion      1.2.15
-%define   fixversion      .2
+%define   baseversion     1.2.16
+%define   libversion      1.2.16
+#define   fixversion      .1
 %global   _hardened_build 1
 
 %global   utils_patch     0
@@ -73,7 +73,7 @@ Architecture (ALSA) framework and Fast Fourier Transform library.
 %endif
 
 %build
-autoreconf -vif
+#autoreconf -vif
 %configure CFLAGS="$RPM_OPT_FLAGS -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64" --disable-alsaconf \
    --with-udev-rules-dir=%{_prefix}/lib/udev/rules.d \
    --with-systemdsystemunitdir=%{_unitdir} \
@@ -213,6 +213,9 @@ fi
 %systemd_postun_with_restart alsa-state.service
 
 %changelog
+* Wed Jun 24 2026 Jaroslav Kysela <perex@perex.cz> - 1.2.16-1
+* Updated to 1.2.16
+
 * Thu Jan 22 2026 Jaroslav Kysela <perex@perex.cz> - 1.2.15.2-1
 * Updated to 1.2.15.2
 
